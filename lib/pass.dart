@@ -63,21 +63,57 @@ class PassContext {
 
   /// Adds an empty library to [component] for a pass to generate code into.
   ///
-  /// The import URI is derived from [name] and made unique, since a snapshot
-  /// cannot hold two libraries under the same URI.
+  /// Both URIs of the library are derived from [name] and made unique: a
+  /// snapshot cannot hold two libraries under the same import URI, nor two
+  /// sources under the same file URI.
   Library addSupportLibrary(String name) {
-    final Set<Uri> taken = component.libraries
-        .map((Library library) => library.importUri)
-        .toSet();
-    Uri uri = Uri.parse('package:flutter_shield/$name.dart');
-    for (int suffix = 1; taken.contains(uri); suffix++) {
-      uri = Uri.parse('package:flutter_shield/$name$suffix.dart');
+    final taken = <Uri>{
+      for (final Library library in component.libraries) ...<Uri>[
+        library.importUri,
+        library.fileUri,
+      ],
+      ...component.uriToSource.keys,
+    };
+    String unique = name;
+    for (
+      int suffix = 1;
+      taken.contains(_importUriFor(unique)) ||
+          taken.contains(_fileUriFor(unique));
+      suffix++
+    ) {
+      unique = '$name$suffix';
     }
 
-    final library = Library(uri, fileUri: uri, name: name)..fileOffset = 0;
+    final library = Library(
+      _importUriFor(unique),
+      fileUri: _fileUriFor(unique),
+      name: name,
+    )..fileOffset = 0;
     component.libraries.add(library);
     library.parent = component;
     registerGeneratedLibrary(component, library);
     return library;
   }
+
+  /// The URI a generated library is imported under.
+  ///
+  /// Nothing resolves it - the passes reference the generated members
+  /// directly - it only has to be distinct from every other library of the
+  /// snapshot, and to say where the code came from when it shows up in a
+  /// stack trace or an obfuscation map.
+  static Uri _importUriFor(String name) =>
+      Uri.parse('package:flutter_shield/$name.dart');
+
+  /// The URI of the source a generated library pretends to come from.
+  ///
+  /// There is no such file, and the snapshot carries an empty source for it,
+  /// but the URI still has to be one the AOT compiler can turn back into a
+  /// path: `--split-debug-info` makes `gen_snapshot` resolve the file URI of
+  /// every library it emits code for, and it aborts the build on a URI whose
+  /// root it does not know - `file:///`, `org-dartlang-sdk:///` and
+  /// `google3:///` are all of them, which rules out the `package:` URI the
+  /// library is imported under. The root is fixed rather than taken from the
+  /// build machine, so two builds of the same sources still agree.
+  static Uri _fileUriFor(String name) =>
+      Uri.parse('file:///flutter_shield/$name.dart');
 }
