@@ -1,0 +1,73 @@
+diff --git a/packages/flutter_tools/lib/src/build_system/targets/common.dart b/packages/flutter_tools/lib/src/build_system/targets/common.dart
+index 692bc456838..a6f882c9b8d 100644
+--- a/packages/flutter_tools/lib/src/build_system/targets/common.dart
++++ b/packages/flutter_tools/lib/src/build_system/targets/common.dart
+@@ -148,6 +148,7 @@ class KernelSnapshot extends Target {
+     Source.pattern(
+       '{FLUTTER_ROOT}/packages/flutter_tools/lib/src/build_system/targets/common.dart',
+     ),
++    Source.pattern('{FLUTTER_ROOT}/$flutterShieldEntrypoint'),
+     Source.artifact(Artifact.platformKernelDill),
+     Source.artifact(Artifact.engineDartBinary),
+     Source.artifact(Artifact.engineDartAotRuntime),
+@@ -175,6 +176,15 @@ class KernelSnapshot extends Target {
+   static const dillName = 'app.dill';
+   static const recordedUsesFileName = 'recorded_uses.json';
+ 
++  /// The FlutterShield tool entrypoint, relative to the flutter root.
++  ///
++  /// It is invoked with `dart run`, so it does not need to be compiled ahead
++  /// of time.
++  static const flutterShieldEntrypoint = '../bin/flutter_shield.dart';
++
++  /// The name FlutterShield writes to, before it replaces [dillName].
++  static const hardenedDillName = 'app.hardened.dill';
++
+   /// The content of an empty recorded uses file.
+   ///
+   /// We always write this file even if no resources are recorded to prevent
+@@ -314,6 +324,44 @@ class KernelSnapshot extends Target {
+     if (output == null || output.errorCount != 0) {
+       throw Exception();
+     }
++
++    if (buildMode == BuildMode.release) {
++      await _runFlutterShield(environment, dillPath);
++    }
++  }
++
++  /// Runs the FlutterShield tool over the kernel snapshot at [dillPath],
++  /// replacing it with the processed one.
++  ///
++  /// The tool is invoked with the input dill as the first argument and the
++  /// destination of the processed dill as the second, and is expected to write
++  /// the latter. It is run here rather than as a separate [Target] so that
++  /// every consumer of the snapshot sees the processed dill, whichever AOT
++  /// target the platform uses.
++  Future<void> _runFlutterShield(Environment environment, String dillPath) async {
++    final File inputDill = environment.fileSystem.file(dillPath);
++    final File hardenedDill = environment.buildDir.childFile(hardenedDillName);
++
++    final command = <String>[
++      environment.artifacts.getArtifactPath(Artifact.engineDartBinary),
++      'run',
++      environment.fileSystem.path.normalize(
++        environment.fileSystem.path.join(environment.flutterRootDir.path, flutterShieldEntrypoint),
++      ),
++      inputDill.path,
++      hardenedDill.path,
++    ];
++    environment.logger.printTrace('Running FlutterShield: ${command.join(' ')}');
++
++    final ProcessResult result = await environment.processManager.run(command);
++    if (result.exitCode != 0) {
++      throw Exception('FlutterShield exited with code ${result.exitCode}.\n${result.stderr}');
++    }
++    if (!hardenedDill.existsSync()) {
++      throw Exception('FlutterShield did not write the processed dill to ${hardenedDill.path}.');
++    }
++
++    hardenedDill.renameSync(inputDill.path);
+   }
+ 
+   Future<void> _addFlavorToDartDefines(
