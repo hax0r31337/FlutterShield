@@ -28,9 +28,28 @@ ones are handed to the tool as environment variables.
 | Define       | Meaning                                                                                                                                                                                                                                                                                                                                  |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `FS_PACKAGE` | **(required)** Regex matched against the package name of each library. Only `package:` libraries are ever selected; `dart:` and loose `file:` libraries are always left alone. The regex is not anchored for you, so `^my_app$` selects `package:my_app/...` and nothing else, while `my_app` would also select `package:my_app_models`. |
-| `FS_SEED`    | Fixed cipher seed, for a reproducible build. A random seed is drawn per build when unset.                                                                                                                                                                                                                                                |
+| `FS_SEED`    | Fixed seed for the random choices the passes make, for a reproducible build. A random seed is drawn per build when unset.                                                                                                                                                                                                               |
 
 ## Features
+
+- Field shuffling
+
+The classes of the selected libraries get their fields declared in a random
+order. Nothing in a Dart program can read that order back out, but the VM lays
+its objects out in it, so it decides the slot every field ends up at - and in
+AOT code with `--obfuscate` a field access is nothing but that slot. Shuffling
+leaves a reader of the snapshot with offsets that no longer line up with the
+source, or with the other classes of the program, and costs nothing at runtime.
+
+The one thing the order decides besides the layout is left alone: a constructor
+runs the initializers the instance fields declare in declaration order, so the
+fields whose initializer can tell keep their order relative to one another. On a
+release snapshot none of them can - the front end's type flow analysis has
+already hoisted every such initializer into the constructors, and what a field
+still holds is a constant the VM stores into the instance directly - but the
+pass checks rather than assumes. A `dart:ffi` `Struct` or `Union` is skipped
+outright, because there the field order is the ABI the native side on the other
+end expects.
 
 - String obfuscation
 

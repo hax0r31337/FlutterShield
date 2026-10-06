@@ -4,6 +4,7 @@ library;
 export 'ast_builder.dart';
 export 'package_filter.dart';
 export 'pass.dart';
+export 'passes/field_shuffle.dart';
 export 'passes/string_encryption.dart';
 export 'shield.dart';
 export 'snapshot.dart';

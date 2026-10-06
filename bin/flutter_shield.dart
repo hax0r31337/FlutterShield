@@ -6,7 +6,8 @@ import 'package:kernel/ast.dart';
 /// Regex of the packages to obfuscate, as described in the README.
 const String packageVariable = 'FS_PACKAGE';
 
-/// Optional fixed cipher seed, for a reproducible build.
+/// Optional fixed seed for the random choices the passes make, for a
+/// reproducible build.
 const String seedVariable = 'FS_SEED';
 
 Future<void> main(List<String> arguments) async {
@@ -16,7 +17,7 @@ Future<void> main(List<String> arguments) async {
       '  $packageVariable  required, regex matched against package names, selects what to obfuscate',
     );
     stderr.writeln(
-      '  $seedVariable     fixed cipher seed, random per build when unset',
+      '  $seedVariable     fixed seed for the passes, random per build when unset',
     );
     exit(64);
   }
@@ -63,7 +64,10 @@ Future<void> main(List<String> arguments) async {
   final Component component = readSnapshot(input.path);
   Shield(
     filter: filter,
-    passes: <ObfuscationPass>[StringEncryptionPass(seed: seed)],
+    passes: <ObfuscationPass>[
+      FieldShufflePass(seed: seed),
+      StringEncryptionPass(seed: seed),
+    ],
     logger: (String message) => stdout.writeln('flutter_shield: $message'),
   ).harden(component);
 

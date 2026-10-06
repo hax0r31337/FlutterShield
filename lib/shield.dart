@@ -4,6 +4,7 @@ import 'package:kernel/ast.dart';
 
 import 'package_filter.dart';
 import 'pass.dart';
+import 'passes/field_shuffle.dart';
 import 'passes/string_encryption.dart';
 
 /// Runs obfuscation passes over the kernel snapshot of an application.
@@ -17,7 +18,13 @@ class Shield {
        _logger = logger ?? print;
 
   /// The passes every build runs, in order.
+  ///
+  /// Field shuffling goes first because it reads the field initializers to
+  /// decide what it may move, and string encryption rewrites a plain
+  /// `final x = 'y'` into a call. Run the other way around, every such field
+  /// would look like one whose initializer has to keep its place.
   static const List<ObfuscationPass> defaultPasses = <ObfuscationPass>[
+    FieldShufflePass(),
     StringEncryptionPass(),
   ];
 
