@@ -17,17 +17,18 @@ A compile time pass patch for Flutter that adds obfuscation capabilities beyond 
 The passes run as part of the `kernel_snapshot_program` build step of a
 **release** build, on the snapshot the front end just produced and before
 `gen_snapshot` turns it into machine code. A build that passes no `FS_`-prefixed
-dart define does not run FlutterShield at all.
+dart define does not run FlutterShield at all; once one is passed, `FS_PACKAGE`
+is required and the build fails without it.
 
 ### Configuration
 
 Dart defines are not visible to the processes of a build, so the `FS_`-prefixed
 ones are handed to the tool as environment variables.
 
-| Define | Meaning |
-| --- | --- |
-| `FS_PACKAGE` | Regex matched against the package name of each library. Only `package:` libraries are ever selected; `dart:` and loose `file:` libraries are always left alone. The regex is not anchored for you, so `^my_app$` selects `package:my_app/...` and nothing else, while `my_app` would also select `package:my_app_models`. Without it nothing is obfuscated. |
-| `FS_SEED` | Fixed cipher seed, for a reproducible build. A random seed is drawn per build when unset. |
+| Define       | Meaning                                                                                                                                                                                                                                                                                                                                  |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FS_PACKAGE` | **(required)** Regex matched against the package name of each library. Only `package:` libraries are ever selected; `dart:` and loose `file:` libraries are always left alone. The regex is not anchored for you, so `^my_app$` selects `package:my_app/...` and nothing else, while `my_app` would also select `package:my_app_models`. |
+| `FS_SEED`    | Fixed cipher seed, for a reproducible build. A random seed is drawn per build when unset.                                                                                                                                                                                                                                                |
 
 ## Features
 
@@ -52,18 +53,18 @@ widget.
 
 ## Layout
 
-| Path | |
-| --- | --- |
-| `bin/flutter_shield.dart` | The tool the patched build step runs, one snapshot in, one out. |
-| `lib/pass.dart` | The pass abstraction: what a pass is handed and what it may rewrite. |
-| `lib/package_filter.dart` | Which libraries are the author's own code. |
-| `lib/shield.dart` | Runs the passes over a snapshot. |
-| `lib/snapshot.dart` | Reading and writing snapshots without losing the VM's metadata. |
-| `lib/ast_builder.dart` | The kernel expressions the passes generate. |
-| `lib/passes/` | The passes themselves. |
-| `scripts/patch.sh` | Fetches and patches the flutter SDK in `flutter_bin`. |
-| `scripts/make_patch.sh` | Regenerates `patch.diff` from the changes in `flutter_bin`. |
-| `scripts/vendor.sh` | Vendors `package:kernel` and `package:vm` from the Dart SDK. |
+| Path                      |                                                                      |
+| ------------------------- | -------------------------------------------------------------------- |
+| `bin/flutter_shield.dart` | The tool the patched build step runs, one snapshot in, one out.      |
+| `lib/pass.dart`           | The pass abstraction: what a pass is handed and what it may rewrite. |
+| `lib/package_filter.dart` | Which libraries are the author's own code.                           |
+| `lib/shield.dart`         | Runs the passes over a snapshot.                                     |
+| `lib/snapshot.dart`       | Reading and writing snapshots without losing the VM's metadata.      |
+| `lib/ast_builder.dart`    | The kernel expressions the passes generate.                          |
+| `lib/passes/`             | The passes themselves.                                               |
+| `scripts/patch.sh`        | Fetches and patches the flutter SDK in `flutter_bin`.                |
+| `scripts/make_patch.sh`   | Regenerates `patch.diff` from the changes in `flutter_bin`.          |
+| `scripts/vendor.sh`       | Vendors `package:kernel` and `package:vm` from the Dart SDK.         |
 
 `package:kernel` and `package:vm` are not published on pub.dev and the copies in
 the Dart SDK repository are workspace members, so they cannot be git

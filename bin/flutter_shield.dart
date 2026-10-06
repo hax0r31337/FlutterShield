@@ -13,7 +13,7 @@ Future<void> main(List<String> arguments) async {
   if (arguments.length != 2) {
     stderr.writeln('usage: flutter_shield <input.dill> <output.dill>');
     stderr.writeln(
-      '  $packageVariable  regex matched against package names, selects what to obfuscate',
+      '  $packageVariable  required, regex matched against package names, selects what to obfuscate',
     );
     stderr.writeln(
       '  $seedVariable     fixed cipher seed, random per build when unset',
@@ -28,9 +28,24 @@ Future<void> main(List<String> arguments) async {
     exit(66);
   }
 
+  // A build that silently ships unobfuscated is worse than one that fails, so
+  // a missing filter is an error rather than a pass through.
+  final String? rawPattern = Platform.environment[packageVariable];
+  if (rawPattern == null || rawPattern.isEmpty) {
+    stderr.writeln(
+      'flutter_shield: $packageVariable is not set, refusing to build an '
+      'unobfuscated snapshot',
+    );
+    stderr.writeln(
+      '  pass it as a regex over package names, for example '
+      '$packageVariable=^my_app\$',
+    );
+    exit(64);
+  }
+
   final PackageFilter filter;
   try {
-    filter = PackageFilter.parse(Platform.environment[packageVariable]);
+    filter = PackageFilter.matching(rawPattern);
   } on FormatException catch (error) {
     stderr.writeln('flutter_shield: $packageVariable: ${error.message}');
     exit(64);
@@ -44,16 +59,6 @@ Future<void> main(List<String> arguments) async {
   }
 
   output.parent.createSync(recursive: true);
-
-  // Nothing selected: hand the snapshot through untouched rather than
-  // round tripping it through the kernel reader and writer for nothing.
-  if (filter.selectsNothing) {
-    stdout.writeln(
-      'flutter_shield: $packageVariable is not set, passing the snapshot through',
-    );
-    input.copySync(output.path);
-    return;
-  }
 
   final Component component = readSnapshot(input.path);
   Shield(
