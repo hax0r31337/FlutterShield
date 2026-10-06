@@ -52,3 +52,10 @@ else
     echo "applying patch.diff"
     git -C "$FLUTTER_DIR" apply "$PATCH_FILE"
 fi
+
+# The flutter tool snapshot is only rebuilt when the checkout's revision
+# changes, which patching the tool's sources does not do.
+rm -f "$FLUTTER_DIR/bin/cache/flutter_tools.stamp"
+
+# The vendored SDK packages are needed to read and write the snapshots.
+"$ROOT/scripts/vendor.sh"

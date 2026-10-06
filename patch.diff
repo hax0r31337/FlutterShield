@@ -1,5 +1,5 @@
 diff --git a/packages/flutter_tools/lib/src/build_system/targets/common.dart b/packages/flutter_tools/lib/src/build_system/targets/common.dart
-index 692bc456838..a6f882c9b8d 100644
+index 692bc456838..b60e4788116 100644
 --- a/packages/flutter_tools/lib/src/build_system/targets/common.dart
 +++ b/packages/flutter_tools/lib/src/build_system/targets/common.dart
 @@ -148,6 +148,7 @@ class KernelSnapshot extends Target {
@@ -10,7 +10,7 @@ index 692bc456838..a6f882c9b8d 100644
      Source.artifact(Artifact.platformKernelDill),
      Source.artifact(Artifact.engineDartBinary),
      Source.artifact(Artifact.engineDartAotRuntime),
-@@ -175,6 +176,15 @@ class KernelSnapshot extends Target {
+@@ -175,6 +176,19 @@ class KernelSnapshot extends Target {
    static const dillName = 'app.dill';
    static const recordedUsesFileName = 'recorded_uses.json';
  
@@ -23,16 +23,20 @@ index 692bc456838..a6f882c9b8d 100644
 +  /// The name FlutterShield writes to, before it replaces [dillName].
 +  static const hardenedDillName = 'app.hardened.dill';
 +
++  /// Dart defines with this prefix configure FlutterShield; it is skipped
++  /// entirely when a build passes none of them.
++  static const flutterShieldDefinePrefix = 'FS_';
++
    /// The content of an empty recorded uses file.
    ///
    /// We always write this file even if no resources are recorded to prevent
-@@ -314,6 +324,44 @@ class KernelSnapshot extends Target {
+@@ -314,6 +328,70 @@ class KernelSnapshot extends Target {
      if (output == null || output.errorCount != 0) {
        throw Exception();
      }
 +
 +    if (buildMode == BuildMode.release) {
-+      await _runFlutterShield(environment, dillPath);
++      await _runFlutterShield(environment, dillPath, dartDefines);
 +    }
 +  }
 +
@@ -44,7 +48,29 @@ index 692bc456838..a6f882c9b8d 100644
 +  /// the latter. It is run here rather than as a separate [Target] so that
 +  /// every consumer of the snapshot sees the processed dill, whichever AOT
 +  /// target the platform uses.
-+  Future<void> _runFlutterShield(Environment environment, String dillPath) async {
++  ///
++  /// It is configured through the `FS_`-prefixed entries of [dartDefines],
++  /// which are handed to it as environment variables; dart defines themselves
++  /// only reach the compiled program, not the processes of the build.
++  Future<void> _runFlutterShield(
++    Environment environment,
++    String dillPath,
++    List<String> dartDefines,
++  ) async {
++    final shieldEnvironment = <String, String>{};
++    for (final String define in dartDefines) {
++      if (!define.startsWith(flutterShieldDefinePrefix)) {
++        continue;
++      }
++      final int separator = define.indexOf('=');
++      if (separator > 0) {
++        shieldEnvironment[define.substring(0, separator)] = define.substring(separator + 1);
++      }
++    }
++    if (shieldEnvironment.isEmpty) {
++      return;
++    }
++
 +    final File inputDill = environment.fileSystem.file(dillPath);
 +    final File hardenedDill = environment.buildDir.childFile(hardenedDillName);
 +
@@ -59,7 +85,11 @@ index 692bc456838..a6f882c9b8d 100644
 +    ];
 +    environment.logger.printTrace('Running FlutterShield: ${command.join(' ')}');
 +
-+    final ProcessResult result = await environment.processManager.run(command);
++    final ProcessResult result = await environment.processManager.run(
++      command,
++      environment: shieldEnvironment,
++    );
++    environment.logger.printTrace(result.stdout.toString().trim());
 +    if (result.exitCode != 0) {
 +      throw Exception('FlutterShield exited with code ${result.exitCode}.\n${result.stderr}');
 +    }

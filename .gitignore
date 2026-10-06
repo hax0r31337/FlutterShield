@@ -1,5 +1,11 @@
+# Fetched by scripts/patch.sh
 flutter_bin/
 .flutter_dl.*/
+
+# Vendored by scripts/vendor.sh
+kernel_pkg/
+vm_pkg/
+.vendor_dl.*/
 
 # https://dart.dev/tools/private-files
 # Created by `dart pub`

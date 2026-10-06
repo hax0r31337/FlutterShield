@@ -13,10 +13,13 @@
 
 include: package:lints/recommended.yaml
 
-# The patched flutter SDK checkout is not part of this project.
+# Neither the patched flutter SDK checkout nor the vendored package:kernel are
+# part of this project.
 analyzer:
   exclude:
     - flutter_bin/**
+    - kernel_pkg/**
+    - vm_pkg/**
 
 # Uncomment the following section to specify additional rules.
 

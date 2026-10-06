@@ -1,14 +1,19 @@
 name: flutter_shield
-description: A sample command-line application.
+description: Compile time obfuscation passes for Flutter kernel snapshots.
 version: 1.0.0
+publish_to: none
 # repository: https://github.com/my_org/my_repo
 
 environment:
   sdk: ^3.13.5
 
-# Add regular dependencies here.
 dependencies:
   path: ^1.9.0
+  # Vendored by scripts/vendor.sh, see the comment there.
+  kernel:
+    path: kernel_pkg
+  vm:
+    path: vm_pkg
 
 dev_dependencies:
   lints: ^6.0.0

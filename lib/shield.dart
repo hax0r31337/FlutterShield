@@ -1,0 +1,69 @@
+import 'dart:math';
+
+import 'package:kernel/ast.dart';
+
+import 'package_filter.dart';
+import 'pass.dart';
+import 'passes/string_encryption.dart';
+
+/// Runs obfuscation passes over the kernel snapshot of an application.
+class Shield {
+  Shield({
+    required this.filter,
+    List<ObfuscationPass>? passes,
+    this.random,
+    void Function(String message)? logger,
+  }) : passes = passes ?? defaultPasses,
+       _logger = logger ?? print;
+
+  /// The passes every build runs, in order.
+  static const List<ObfuscationPass> defaultPasses = <ObfuscationPass>[
+    StringEncryptionPass(),
+  ];
+
+  /// Which libraries of the snapshot are the author's own code.
+  final PackageFilter filter;
+
+  final List<ObfuscationPass> passes;
+
+  final Random? random;
+
+  final void Function(String message) _logger;
+
+  /// Rewrites [component] in place, and reports whether anything ran.
+  bool harden(Component component) {
+    if (filter.selectsNothing) {
+      _logger('no package filter set, nothing to do');
+      return false;
+    }
+    if (!component.libraries.any(
+      (Library library) => library.importUri.toString() == 'dart:core',
+    )) {
+      throw StateError(
+        'the snapshot does not have the platform linked into it, which the '
+        'generated code needs to reference dart:core',
+      );
+    }
+
+    final context = PassContext(
+      component: component,
+      filter: filter,
+      random: random,
+      logger: _logger,
+    );
+    if (context.libraries.isEmpty) {
+      _logger(
+        '${filter.pattern} matched none of the libraries in the snapshot',
+      );
+      return false;
+    }
+
+    _logger(
+      'hardening ${context.libraries.length} libraries matching ${filter.pattern}',
+    );
+    for (final ObfuscationPass pass in passes) {
+      pass.run(context);
+    }
+    return true;
+  }
+}
