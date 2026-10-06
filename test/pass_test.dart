@@ -86,4 +86,65 @@ void main() {
     expect(support.fileUri, isNot(contested));
     expect(component.uriToSource[contested]!.importUri, app.importUri);
   });
+
+  group('pass selection', () {
+    const List<ObfuscationPass> available = <ObfuscationPass>[
+      FieldShufflePass(),
+      StringEncryptionPass(),
+    ];
+
+    List<String> namesOf(String? value) => selectPasses(
+      available,
+      value,
+    ).map((ObfuscationPass pass) => pass.name).toList();
+
+    test('an unset or blank value selects every pass', () {
+      expect(namesOf(null), <String>['field-shuffle', 'string-encryption']);
+      expect(namesOf(''), <String>['field-shuffle', 'string-encryption']);
+      expect(namesOf('  '), <String>['field-shuffle', 'string-encryption']);
+    });
+
+    test('a value selects the passes it names', () {
+      expect(namesOf('string-encryption'), <String>['string-encryption']);
+      expect(namesOf('field-shuffle'), <String>['field-shuffle']);
+    });
+
+    test('the selected passes keep the order they have to run in', () {
+      // Whichever order the value lists them in, and however often.
+      expect(namesOf('string-encryption,field-shuffle'), <String>[
+        'field-shuffle',
+        'string-encryption',
+      ]);
+      expect(
+        namesOf(' string-encryption , field-shuffle , field-shuffle '),
+        <String>['field-shuffle', 'string-encryption'],
+      );
+    });
+
+    test('a value naming an unknown pass is rejected', () {
+      // Running fewer passes than the build asked for has to fail loudly,
+      // rather than ship a snapshot the author believes is hardened.
+      expect(
+        () => selectPasses(available, 'string-encrytpion'),
+        throwsA(
+          isA<FormatException>().having(
+            (FormatException error) => error.message,
+            'message',
+            allOf(
+              contains('string-encrytpion'),
+              contains('field-shuffle, string-encryption'),
+            ),
+          ),
+        ),
+      );
+      expect(
+        () => selectPasses(available, 'field-shuffle,nope'),
+        throwsFormatException,
+      );
+    });
+
+    test('a value naming no pass at all is rejected', () {
+      expect(() => selectPasses(available, ','), throwsFormatException);
+    });
+  });
 }

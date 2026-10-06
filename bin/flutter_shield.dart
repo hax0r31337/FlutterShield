@@ -10,6 +10,9 @@ const String packageVariable = 'FS_PACKAGE';
 /// reproducible build.
 const String seedVariable = 'FS_SEED';
 
+/// Optional comma separated list of the passes to run, every pass when unset.
+const String passesVariable = 'FS_PASSES';
+
 Future<void> main(List<String> arguments) async {
   if (arguments.length != 2) {
     stderr.writeln('usage: flutter_shield <input.dill> <output.dill>');
@@ -18,6 +21,10 @@ Future<void> main(List<String> arguments) async {
     );
     stderr.writeln(
       '  $seedVariable     fixed seed for the passes, random per build when unset',
+    );
+    stderr.writeln(
+      '  $passesVariable   comma separated passes to run, all of them when unset: '
+      '${Shield.passesWithSeed(null).map((ObfuscationPass pass) => pass.name).join(', ')}',
     );
     exit(64);
   }
@@ -59,15 +66,23 @@ Future<void> main(List<String> arguments) async {
     exit(64);
   }
 
+  final List<ObfuscationPass> passes;
+  try {
+    passes = selectPasses(
+      Shield.passesWithSeed(seed),
+      Platform.environment[passesVariable],
+    );
+  } on FormatException catch (error) {
+    stderr.writeln('flutter_shield: $passesVariable: ${error.message}');
+    exit(64);
+  }
+
   output.parent.createSync(recursive: true);
 
   final Component component = readSnapshot(input.path);
   Shield(
     filter: filter,
-    passes: <ObfuscationPass>[
-      FieldShufflePass(seed: seed),
-      StringEncryptionPass(seed: seed),
-    ],
+    passes: passes,
     logger: (String message) => stdout.writeln('flutter_shield: $message'),
   ).harden(component);
 

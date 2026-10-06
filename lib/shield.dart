@@ -14,18 +14,19 @@ class Shield {
     List<ObfuscationPass>? passes,
     this.random,
     void Function(String message)? logger,
-  }) : passes = passes ?? defaultPasses,
+  }) : passes = passes ?? passesWithSeed(null),
        _logger = logger ?? print;
 
-  /// The passes every build runs, in order.
+  /// Every pass the tool knows, in the order they have to run in, each handed
+  /// [seed] - null for the randomness of the run itself.
   ///
   /// Field shuffling goes first because it reads the field initializers to
   /// decide what it may move, and string encryption rewrites a plain
   /// `final x = 'y'` into a call. Run the other way around, every such field
   /// would look like one whose initializer has to keep its place.
-  static const List<ObfuscationPass> defaultPasses = <ObfuscationPass>[
-    FieldShufflePass(),
-    StringEncryptionPass(),
+  static List<ObfuscationPass> passesWithSeed(int? seed) => <ObfuscationPass>[
+    FieldShufflePass(seed: seed),
+    StringEncryptionPass(seed: seed),
   ];
 
   /// Which libraries of the snapshot are the author's own code.

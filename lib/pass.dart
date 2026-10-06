@@ -25,6 +25,58 @@ abstract class ObfuscationPass {
   void run(PassContext context);
 }
 
+/// Returns the passes of [available] that [names] selects, in the order
+/// [available] lists them.
+///
+/// [names] is the value of `FS_PASSES`, a comma separated list of
+/// [ObfuscationPass.name]s. A missing or blank value selects every pass, so a
+/// build that does not care which passes exist gets all of them; the order the
+/// passes run in is the one [available] fixes either way, because passes are
+/// not independent of one another.
+///
+/// Throws a [FormatException] if [names] holds an entry that is not the name of
+/// an available pass, or no entry at all - running nothing while the build
+/// thinks it asked for something is the failure this is here to prevent.
+List<ObfuscationPass> selectPasses(
+  List<ObfuscationPass> available,
+  String? names,
+) {
+  if (names == null || names.trim().isEmpty) {
+    return List<ObfuscationPass>.unmodifiable(available);
+  }
+
+  final selected = <String>{
+    for (final String entry in names.split(','))
+      if (entry.trim().isNotEmpty) entry.trim(),
+  };
+  final String known = available
+      .map((ObfuscationPass pass) => pass.name)
+      .join(', ');
+  if (selected.isEmpty) {
+    throw FormatException('names no pass, known passes are $known', names);
+  }
+
+  final List<String> unknown =
+      selected
+          .where(
+            (String name) =>
+                !available.any((ObfuscationPass pass) => pass.name == name),
+          )
+          .toList()
+        ..sort();
+  if (unknown.isNotEmpty) {
+    throw FormatException(
+      'unknown pass${unknown.length == 1 ? '' : 'es'} ${unknown.join(', ')}, '
+      'known passes are $known',
+      names,
+    );
+  }
+
+  return List<ObfuscationPass>.unmodifiable(
+    available.where((ObfuscationPass pass) => selected.contains(pass.name)),
+  );
+}
+
 /// The component under obfuscation, plus the shared state every pass needs.
 class PassContext {
   PassContext({

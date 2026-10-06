@@ -307,7 +307,7 @@ void main() {
     test('survives the whole default pipeline', () async {
       // Field shuffling reads the field initializers and string encryption
       // rewrites them, so the two passes have to be run in the order
-      // [Shield.defaultPasses] lists them, and the result still has to behave.
+      // [Shield.passesWithSeed] lists them, and the result still has to behave.
       final ProcessResult before = Process.runSync(
         Platform.resolvedExecutable,
         <String>[appDill],

@@ -29,6 +29,7 @@ ones are handed to the tool as environment variables.
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `FS_PACKAGE` | **(required)** Regex matched against the package name of each library. Only `package:` libraries are ever selected; `dart:` and loose `file:` libraries are always left alone. The regex is not anchored for you, so `^my_app$` selects `package:my_app/...` and nothing else, while `my_app` would also select `package:my_app_models`. |
 | `FS_SEED`    | Fixed seed for the random choices the passes make, for a reproducible build. A random seed is drawn per build when unset.                                                                                                                                                                                                               |
+| `FS_PASSES`  | Comma separated names of the passes to run, out of `field-shuffle` and `string-encryption`. Every pass runs when unset. The passes always run in the order listed under Features, whichever order this names them in, and a name that is not a pass fails the build.                                                                      |
 
 ## Features
 
