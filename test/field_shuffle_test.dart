@@ -327,6 +327,7 @@ void main() {
         isTrue,
         reason: logs.join('\n'),
       );
+      expect(logs.join('\n'), contains('path-scrub:'));
       expect(logs.join('\n'), contains('field-shuffle:'));
       expect(logs.join('\n'), contains('string-encryption:'));
 

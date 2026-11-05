@@ -36,29 +36,6 @@ Future<void> main(List<String> arguments) async {
     exit(66);
   }
 
-  // A build that silently ships unobfuscated is worse than one that fails, so
-  // a missing filter is an error rather than a pass through.
-  final String? rawPattern = Platform.environment[packageVariable];
-  if (rawPattern == null || rawPattern.isEmpty) {
-    stderr.writeln(
-      'flutter_shield: $packageVariable is not set, refusing to build an '
-      'unobfuscated snapshot',
-    );
-    stderr.writeln(
-      '  pass it as a regex over package names, for example '
-      '$packageVariable=^my_app\$',
-    );
-    exit(64);
-  }
-
-  final PackageFilter filter;
-  try {
-    filter = PackageFilter.matching(rawPattern);
-  } on FormatException catch (error) {
-    stderr.writeln('flutter_shield: $packageVariable: ${error.message}');
-    exit(64);
-  }
-
   final String? rawSeed = Platform.environment[seedVariable];
   final int? seed = rawSeed == null ? null : int.tryParse(rawSeed);
   if (rawSeed != null && seed == null) {
@@ -74,6 +51,36 @@ Future<void> main(List<String> arguments) async {
     );
   } on FormatException catch (error) {
     stderr.writeln('flutter_shield: $passesVariable: ${error.message}');
+    exit(64);
+  }
+
+  // A build that silently ships unobfuscated is worse than one that fails, so
+  // a missing filter is an error rather than a pass through - unless every
+  // pass that was asked for is one the filter does not apply to, which is a
+  // build that has nothing to say about which code is the author's.
+  final bool needsFilter = passes.any((ObfuscationPass pass) => pass.scoped);
+  final String? rawPattern = Platform.environment[packageVariable];
+  if (needsFilter && (rawPattern == null || rawPattern.isEmpty)) {
+    stderr.writeln(
+      'flutter_shield: $packageVariable is not set, refusing to build an '
+      'unobfuscated snapshot',
+    );
+    stderr.writeln(
+      '  pass it as a regex over package names, for example '
+      '$packageVariable=^my_app\$',
+    );
+    stderr.writeln(
+      '  the passes that do not need it: '
+      '${Shield.passesWithSeed(null).where((ObfuscationPass pass) => !pass.scoped).map((ObfuscationPass pass) => pass.name).join(', ')}',
+    );
+    exit(64);
+  }
+
+  final PackageFilter filter;
+  try {
+    filter = PackageFilter.parse(rawPattern);
+  } on FormatException catch (error) {
+    stderr.writeln('flutter_shield: $packageVariable: ${error.message}');
     exit(64);
   }
 

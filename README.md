@@ -18,7 +18,13 @@ The passes run as part of the `kernel_snapshot_program` build step of a
 **release** build, on the snapshot the front end just produced and before
 `gen_snapshot` turns it into machine code. A build that passes no `FS_`-prefixed
 dart define does not run FlutterShield at all; once one is passed, `FS_PACKAGE`
-is required and the build fails without it.
+is required and the build fails without it, unless every pass `FS_PASSES` names
+is one the package filter does not apply to.
+
+A pass is either **scoped**, meaning it rewrites the author's own code and
+`FS_PACKAGE` has to say which libraries that is, or **unscoped**, meaning it
+rewrites something the build itself put in the snapshot and runs whether or
+not a package was selected. Path scrubbing is the only unscoped pass.
 
 ### Configuration
 
@@ -27,11 +33,43 @@ ones are handed to the tool as environment variables.
 
 | Define       | Meaning                                                                                                                                                                                                                                                                                                                                  |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FS_PACKAGE` | **(required)** Regex matched against the package name of each library. Only `package:` libraries are ever selected; `dart:` and loose `file:` libraries are always left alone. The regex is not anchored for you, so `^my_app$` selects `package:my_app/...` and nothing else, while `my_app` would also select `package:my_app_models`. |
+| `FS_PACKAGE` | **(required for the scoped passes)** Regex matched against the package name of each library. Only `package:` libraries are ever selected; `dart:` and loose `file:` libraries are left to the unscoped passes. The regex is not anchored for you, so `^my_app$` selects `package:my_app/...` and nothing else, while `my_app` would also select `package:my_app_models`. |
 | `FS_SEED`    | Fixed seed for the random choices the passes make, for a reproducible build. A random seed is drawn per build when unset.                                                                                                                                                                                                               |
-| `FS_PASSES`  | Comma separated names of the passes to run, out of `field-shuffle` and `string-encryption`. Every pass runs when unset. The passes always run in the order listed under Features, whichever order this names them in, and a name that is not a pass fails the build.                                                                      |
+| `FS_PASSES`  | Comma separated names of the passes to run, out of `path-scrub`, `field-shuffle` and `string-encryption`. Every pass runs when unset. The passes always run in the order listed under Features, whichever order this names them in, and a name that is not a pass fails the build.                                                       |
 
 ## Features
+
+- Build path scrubbing (unscoped)
+
+Every library of an app is named by a `package:` URI, which says nothing about
+where it was built, except for a library the build generates outside `lib/`:
+with no package URI to be named by, the front end names it by its path on the
+build box. Flutter generates one such library, the plugin registrant at
+`.dart_tool/flutter_build/dart_plugin_registrant.dart`, whenever a plugin of
+the app declares a `dartPluginClass` for the target platform. That absolute
+path survives `--obfuscate`, `--split-debug-info` and `strip`, and in a
+release build of an app with any such plugin it is the only build path left in
+the shipped `libapp.so`.
+
+It survives because `--obfuscate` renames symbols and this is a library URL,
+which the VM keeps: the embedder reads the const `dartPluginRegistrantLibrary`
+of `package:flutter`, looks the library up *by that URL* and invokes
+`_PluginRegistrant.register()` on it. The front end says as much, adding the
+URI to the obfuscation prohibitions the snapshot carries, so `gen_snapshot
+--save-obfuscation-map` reports the path mapped to itself.
+
+The pass renames every such library to a fixed URI under
+`file:///flutter_shield/` that keeps only the file name, and rewrites the URI
+everywhere at once - the library, the nodes under it, the const the embedder
+reads, the loading units and the obfuscation prohibitions - because a library
+whose URL and name stop agreeing is one the embedder no longer finds, and the
+plugins of a release build would silently stop registering.
+
+Two kinds of absolute path are left alone, because neither reaches the shipped
+snapshot: the path a `package:` library was built from, and with it the source
+map of the snapshot. Those feed the debugging information, which
+`--split-debug-info` writes to a separate file the app does not carry, and
+rewriting them would only corrupt the symbols kept to read crash reports.
 
 - Field shuffling
 

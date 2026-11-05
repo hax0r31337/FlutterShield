@@ -10,16 +10,29 @@ import 'snapshot.dart';
 /// A single obfuscation step over the kernel snapshot of an application.
 ///
 /// A pass is handed the whole [Component] - a release snapshot has the
-/// platform libraries linked into it - but may only rewrite the code of
-/// [PassContext.libraries], the libraries the package filter selected.
-/// Anything a pass generates goes into a support library of its own, see
-/// [PassContext.addSupportLibrary].
+/// platform libraries linked into it - but a [scoped] pass may only rewrite
+/// the code of [PassContext.libraries], the libraries the package filter
+/// selected. Anything a pass generates goes into a support library of its
+/// own, see [PassContext.addSupportLibrary].
 abstract class ObfuscationPass {
   const ObfuscationPass();
 
   /// Stable identifier of this pass, used in logs and to select passes by
   /// name.
   String get name;
+
+  /// Whether this pass only rewrites [PassContext.libraries].
+  ///
+  /// A scoped pass hides the author's own code and needs `FS_PACKAGE` to say
+  /// which libraries that is; it is skipped when the filter selects nothing,
+  /// because there is nothing for it to do.
+  ///
+  /// An unscoped pass rewrites what the build itself put in the snapshot
+  /// rather than anything the author wrote, wherever in the component it
+  /// sits, and so runs whether or not a package was selected. A pass that
+  /// overrides this is saying that the libraries it touches are not the
+  /// author's code and cannot be named by a package filter.
+  bool get scoped => true;
 
   /// Rewrites the component of [context] in place.
   void run(PassContext context);

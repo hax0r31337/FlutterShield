@@ -207,14 +207,21 @@ void main() {
     );
   });
 
-  test('nothing is touched when no package is selected', () async {
+  test('no scoped pass is run when no package is selected', () async {
     final Component component = loadComponentFromBinary(platformDill);
     loadComponentFromBinary(appDill, component);
+
+    // The unscoped passes do not need a package to be selected and run
+    // either way, so the ones under test here are the rest.
+    final List<ObfuscationPass> scoped = Shield.passesWithSeed(null)
+        .where((ObfuscationPass pass) => pass.scoped)
+        .toList();
 
     final logs = <String>[];
     expect(
       Shield(
         filter: PackageFilter.parse(null),
+        passes: scoped,
         logger: logs.add,
       ).harden(component),
       isFalse,
@@ -224,6 +231,7 @@ void main() {
     expect(
       Shield(
         filter: PackageFilter.parse(r'^nothing_matches$'),
+        passes: scoped,
         logger: logs.add,
       ).harden(component),
       isFalse,
